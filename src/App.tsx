@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import './App.css';
 import {
   PriceServiceConnection,
-  PriceFeed,
+  // PriceFeed,
+  Price,
 } from '@pythnetwork/price-service-client';
 import {
   AppBar,
@@ -14,6 +15,8 @@ import {
   ThemeProvider,
   createTheme,
   CssBaseline,
+  Card,
+  CardContent,
 } from '@mui/material';
 import {
   LineChart,
@@ -91,14 +94,24 @@ const darkTheme = createTheme({
   },
 });
 
+interface PriceData {
+  btc: number;
+  eth: number;
+}
+
 function App() {
-  const [currentPrice, setCurrentPrice] = useState<PriceFeed[]>([]);
+  const [pythPrices, setPythPrices] = useState<PriceData>({ btc: 0, eth: 0 });
+  const [chainlinkPrices, setChainlinkPrices] = useState<PriceData>({
+    btc: 0,
+    eth: 0,
+  });
   const [priceHistory, setPriceHistory] = useState<
     { time: number; BTC: number; ETH: number }[]
   >([]);
 
   useEffect(() => {
-    async function fetchDataFromPyth() {
+    async function fetchData() {
+      // use the new pyth oracle model
       const connection = new PriceServiceConnection(
         'https://hermes.pyth.network',
         {
@@ -109,53 +122,70 @@ function App() {
       );
 
       const priceIds = [
-        '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43', // BTC/USD price id
-        '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD price id
+        '0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43', // BTC/USD price id on Pyth
+        '0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace', // ETH/USD price id on Pyth
       ];
 
-      let currentPrices = await connection.getLatestPriceFeeds(priceIds);
-      if (!currentPrices) {
-        currentPrices = [];
+      const currentPrices = await connection.getLatestPriceFeeds(priceIds);
+      console.log('Pyth price', currentPrices);
+      console.log('Inner', currentPrices[0].price.price);
+      // This was really a pain though
+      const btcPriceM = currentPrices?.at(0)?.getPriceNoOlderThan(30);
+      const ethPriceM = currentPrices?.at(1)?.getPriceNoOlderThan(30);
+      const btcPriceN = Number(btcPriceM.price);
+      const ethPriceN = Number(ethPriceM.price);
+      if (currentPrices) {
+        setPythPrices({
+          btc: extractPriceValue(btcPriceN),
+          eth: extractPriceValue(ethPriceN),
+        });
       }
-      setCurrentPrice(currentPrices);
-      console.log(currentPrice);
 
-      // Simulate price history for the chart
+      function extractPriceValue(
+        price: Price | null | undefined | number
+      ): number {
+        if (price && typeof price === 'number') {
+          return price * Math.pow(10, -8);
+        }
+        return 0; // Return 0 if price is null, undefined, or doesn't have the expected structure
+      }
+
+      // Fetch Chainlink data
+      const btcAddr = '0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43';
+      const ethAddr = '0x694AA1769357215DE4FAC081bf1f309aDC325306';
+      const btcPriceFeed = new web3.eth.Contract(
+        aggregatorV3InterfaceABI,
+        btcAddr
+      );
+      const ethPriceFeed = new web3.eth.Contract(
+        aggregatorV3InterfaceABI,
+        ethAddr
+      );
+
+      const [btcData, ethData] = await Promise.all([
+        btcPriceFeed.methods.latestRoundData().call(),
+        ethPriceFeed.methods.latestRoundData().call(),
+      ]);
+
+      setChainlinkPrices({
+        btc: Number(btcData.answer) / 1e8, // Assuming 8 decimals for BTC
+        eth: Number(ethData.answer) / 1e8, // Assuming 8 decimals for ETH
+      });
+
+      // Update price history
       const now = Date.now();
-      const history = Array.from({ length: 20 }, (_, i) => ({
-        time: now - i * 60000,
-        BTC: parseFloat((Math.random() * 1000 + 50000).toFixed(2)),
-        ETH: parseFloat((Math.random() * 100 + 3000).toFixed(2)),
-      })).reverse();
-      setPriceHistory(history);
+      setPriceHistory((prevHistory) => [
+        ...prevHistory.slice(-19),
+        {
+          time: now,
+          BTC: (pythPrices.btc + chainlinkPrices.btc) / 2,
+          ETH: (pythPrices.eth + chainlinkPrices.eth) / 2,
+        },
+      ]);
     }
 
-    fetchDataFromPyth();
-    const interval = setInterval(fetchDataFromPyth, 30000); // Update every 30 seconds
-    const btcAddr = '0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43';
-    const ethAddr = '0x694AA1769357215DE4FAC081bf1f309aDC325306';
-    const btcPriceFeed = new web3.eth.Contract(
-      aggregatorV3InterfaceABI,
-      btcAddr
-    );
-    const ethPriceFeed = new web3.eth.Contract(
-      aggregatorV3InterfaceABI,
-      ethAddr
-    );
-    btcPriceFeed.methods
-      .latestRoundData()
-      .call()
-      .then((roundData) => {
-        console.log('Latest BTC round data', roundData);
-      });
-
-    ethPriceFeed.methods
-      .latestRoundData()
-      .call()
-      .then((roundData) => {
-        console.log('Latest ETH round data', roundData);
-      });
-
+    fetchData();
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -193,16 +223,68 @@ function App() {
     );
   };
 
+  const renderPriceCards = () => {
+    const btcAverage = (pythPrices.btc + chainlinkPrices.btc) / 2;
+    const ethAverage = (pythPrices.eth + chainlinkPrices.eth) / 2;
+
+    return (
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant='h5' component='div'>
+                BTC/USD
+              </Typography>
+              <Typography variant='h4' color='text.secondary'>
+                ${btcAverage.toFixed(2)}
+              </Typography>
+              <Typography variant='body2'>
+                Pyth: ${pythPrices.btc.toFixed(2)} | Chainlink: $
+                {chainlinkPrices.btc.toFixed(2)}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Card>
+            <CardContent>
+              <Typography variant='h5' component='div'>
+                ETH/USD
+              </Typography>
+              <Typography variant='h4' color='text.secondary'>
+                ${ethAverage.toFixed(2)}
+              </Typography>
+              <Typography variant='body2'>
+                Pyth: ${pythPrices.eth.toFixed(2)} | Chainlink: $
+                {chainlinkPrices.eth.toFixed(2)}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    );
+  };
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <AppBar position='static'>
         <Toolbar>
-          <Typography variant='h6'>Oracle Aggregator</Typography>
+          <Typography variant='h6'>
+            Oracle Aggregator (Pyth and Chainlink)
+          </Typography>
         </Toolbar>
       </AppBar>
       <Container maxWidth='lg' sx={{ mt: 4, mb: 4 }}>
         <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant='h6' gutterBottom component='div'>
+                Current Prices
+              </Typography>
+              {renderPriceCards()}
+            </Paper>
+          </Grid>
           <Grid item xs={12}>
             <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
               <Typography variant='h6' gutterBottom component='div'>
@@ -211,19 +293,15 @@ function App() {
               {renderPriceChart()}
             </Paper>
           </Grid>
-          <Grid item xs={12}>
-            <Paper sx={{ p: 2, display: 'flex', flexDirection: 'column' }}>
-              <Typography variant='h6' gutterBottom component='div'>
-                © 2024 Made with ❤️ for Solana
-              </Typography>
-              {/* {renderPriceTable()} */}
-            </Paper>
-          </Grid>
         </Grid>
       </Container>
       <footer
         style={{ textAlign: 'center', padding: '20px', marginTop: 'auto' }}
-      ></footer>
+      >
+        <Typography variant='body2' color='text.secondary'>
+          © 2024 Made with ❤️ for Solana
+        </Typography>
+      </footer>
     </ThemeProvider>
   );
 }
