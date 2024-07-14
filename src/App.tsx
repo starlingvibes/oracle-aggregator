@@ -128,12 +128,12 @@ function App() {
 
       const currentPrices = await connection.getLatestPriceFeeds(priceIds);
       console.log('Pyth price', currentPrices);
-      console.log('Inner', currentPrices[0].price.price);
+      console.log('Inner', currentPrices[0]?.price.price);
       // This was really a pain though
       const btcPriceM = currentPrices?.at(0)?.getPriceNoOlderThan(30);
       const ethPriceM = currentPrices?.at(1)?.getPriceNoOlderThan(30);
-      const btcPriceN = Number(btcPriceM.price);
-      const ethPriceN = Number(ethPriceM.price);
+      const btcPriceN = Number(btcPriceM?.price);
+      const ethPriceN = Number(ethPriceM?.price);
       if (currentPrices) {
         setPythPrices({
           btc: extractPriceValue(btcPriceN),
@@ -154,11 +154,13 @@ function App() {
       const btcAddr = '0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43';
       const ethAddr = '0x694AA1769357215DE4FAC081bf1f309aDC325306';
       const btcPriceFeed = new web3.eth.Contract(
-        aggregatorV3InterfaceABI,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        aggregatorV3InterfaceABI as any,
         btcAddr
       );
       const ethPriceFeed = new web3.eth.Contract(
-        aggregatorV3InterfaceABI,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        aggregatorV3InterfaceABI as any,
         ethAddr
       );
 
