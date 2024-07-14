@@ -11,7 +11,7 @@ Requirements:
 # Demo video
 
 ```
-https://www.loom.com/share/5e2229c0242942728e1c043148a11cdf
+https://www.loom.com/share/c49360d5f8d848c79fb07dd51ec9dc3f
 ```
 
 # Install dependencies
