@@ -1,17 +1,18 @@
-# Tooling Data Explorer powered by AI
+# Oracle Aggregator
 
-Design and develop an explorer or dashboard that fetches data from RPC and/or API sources. The UI should offer a clear and easy-to-use experience for a broad range of users.
+Design and develop an Oracle Aggregator for a DeFi application. The aggregator should pull price feeds from at least two different oracle sources, calculate an average, and display it on the frontend (FE). Note- for this bounty, you MUST use the new Pyth oracle model.
 
 Requirements:
 
-- Data Fetching: Retrieve data from RPC and/or API endpoints.
-- User Experience: Create an intuitive and user-friendly interface.
-- Deployment: Ensure the explorer or dashboard can be tested and deployed on Cloudflare or Vercel.
+- Oracle Integration: Fetch price feeds from at least two different oracle providers.
+- Data Aggregation: Compute the average of the fetched price feeds.
+- Frontend Display: Present the aggregated data on the UI.
+- Deployment: Ensure the application can be tested and deployed on Cloudflare or Vercel.
 
 # Demo video
 
 ```
-https://www.loom.com/share/5e2229c0242942728e1c043148a11cdf
+https://www.loom.com/share/c49360d5f8d848c79fb07dd51ec9dc3f
 ```
 
 # Install dependencies
@@ -19,15 +20,6 @@ https://www.loom.com/share/5e2229c0242942728e1c043148a11cdf
 ```shell
 npm install
 ```
-
-# Configure environment variables
-
-```shell
-cp .env.sample .env
-vim .env
-```
-
-Set the values of the environment variables in the `.env` file.
 
 # Running the project
 

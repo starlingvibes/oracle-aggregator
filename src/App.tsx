@@ -185,9 +185,10 @@ function App() {
         },
       ]);
     }
+    console.log('Price history', priceHistory);
 
     fetchData();
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
